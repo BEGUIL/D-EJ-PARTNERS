@@ -115,6 +115,7 @@
     'Nos expertises': 'Our expertise', 'Secteurs d’intervention': 'Sectors we serve'
   };
   let currentLanguage = 'fr';
+  if (menuButton) menuButton.setAttribute('aria-label', 'Ouvrir la navigation');
 
   window.addEventListener('scroll', () => {
     if (header) header.classList.toggle('scrolled', window.scrollY > 24);
@@ -123,14 +124,44 @@
   if (menuButton) menuButton.addEventListener('click', () => {
     const isOpen = navigation ? navigation.classList.toggle('open') : false;
     menuButton.setAttribute('aria-expanded', String(isOpen));
+    menuButton.setAttribute('aria-label', isOpen ? 'Fermer la navigation' : 'Ouvrir la navigation');
   });
 
   if (navigation) navigation.querySelectorAll('a').forEach((link) => {
     link.addEventListener('click', () => {
       navigation.classList.remove('open');
-      if (menuButton) menuButton.setAttribute('aria-expanded', 'false');
+      if (menuButton) {
+        menuButton.setAttribute('aria-expanded', 'false');
+        menuButton.setAttribute('aria-label', 'Ouvrir la navigation');
+      }
     });
   });
+
+  if (navigation) {
+    if (!navigation.querySelector('a[href="index.html"]')) {
+      const homeLink = document.createElement('a');
+      homeLink.href = 'index.html';
+      homeLink.dataset.fr = 'Accueil';
+      homeLink.dataset.en = 'Home';
+      homeLink.textContent = 'Accueil';
+      navigation.insertBefore(homeLink, navigation.firstChild);
+    }
+    const contactLink = navigation.querySelector('a[href="contact.html"]');
+    if (contactLink) {
+      contactLink.dataset.fr = 'Contact';
+      contactLink.dataset.en = 'Contact';
+      contactLink.textContent = 'Contact';
+    }
+    const currentFile = (window.location.pathname.split('/').pop() || 'index.html').toLowerCase();
+    const activeFile = currentFile.indexOf('expertise-') === 0 ? 'expertises.html' : currentFile;
+    navigation.querySelectorAll('a[href]').forEach((link) => {
+      const targetFile = (link.getAttribute('href') || '').split('#')[0].toLowerCase() || 'index.html';
+      const isCurrent = targetFile === activeFile;
+      link.classList.toggle('active', isCurrent);
+      if (isCurrent) link.setAttribute('aria-current', 'page');
+      else link.removeAttribute('aria-current');
+    });
+  }
 
   function setLanguage(language) {
     const nextLanguage = language === 'en' ? 'en' : 'fr';
@@ -151,6 +182,22 @@
     document.querySelectorAll('[data-fr][data-en]').forEach((element) => {
       const translation = element.getAttribute(`data-${nextLanguage}`);
       if (translation !== null) element.innerHTML = translation;
+    });
+
+    const menuLabels = {
+      'index.html': ['Accueil', 'Home'],
+      'cabinet.html': ['Le cabinet', 'The firm'],
+      'expertises.html': ['Expertises', 'Expertise'],
+      'secteurs.html': ['Secteurs', 'Sectors'],
+      'approche.html': ['Notre approche', 'Our approach'],
+      'formations.html': ['Formations', 'Training'],
+      'publications.html': ['Publications', 'Insights'],
+      'contact.html': ['Contact', 'Contact']
+    };
+    if (navigation) navigation.querySelectorAll('a[href]').forEach((link) => {
+      const target = (link.getAttribute('href') || '').split('#')[0].toLowerCase() || 'index.html';
+      const label = menuLabels[target];
+      if (label) link.textContent = label[nextLanguage === 'fr' ? 0 : 1];
     });
 
     const walker = document.createTreeWalker(document.body, 4);
