@@ -4,6 +4,51 @@
   const navigation = document.querySelector('.nav');
   const languageButtons = document.querySelectorAll('.lang');
   const storageKey = 'ejpartners-language';
+  const revealSelector = [
+    '.hero-content > *',
+    '.page-hero .wrap > *',
+    '.section-head',
+    '.two-col > *',
+    '.cards > *',
+    '.sector-row > *',
+    '.steps > *',
+    '.contact-strip-inner > *',
+    '.content-intro',
+    '.detail-list > *',
+    '.quote',
+    '.cta-row > *',
+    '.page-cards > *',
+    '.contact-grid > *',
+    '.article-grid > *'
+  ].join(',');
+
+  if ('IntersectionObserver' in window && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    const revealTargets = document.querySelectorAll(revealSelector);
+    const revealIndexes = new Map();
+
+    revealTargets.forEach((element) => {
+      const parent = element.parentElement;
+      const index = revealIndexes.get(parent) || 0;
+      element.dataset.reveal = '';
+      element.style.setProperty('--reveal-delay', `${Math.min(index, 5) * 70}ms`);
+      revealIndexes.set(parent, index + 1);
+    });
+
+    if (revealTargets.length) {
+      document.documentElement.classList.add('reveal-ready');
+      const revealObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.12, rootMargin: '0px 0px -6% 0px' });
+
+      revealTargets.forEach((element) => revealObserver.observe(element));
+    }
+  }
+
   const plainTranslations = {
     'Accueil': 'Home', 'Le cabinet': 'The firm', 'Expertises': 'Expertise',
     'Secteurs': 'Sectors', 'Notre approche': 'Our approach', 'Formations': 'Training',
