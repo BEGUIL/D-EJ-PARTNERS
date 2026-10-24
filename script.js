@@ -4,6 +4,175 @@
   const navigation = document.querySelector('.nav');
   const languageButtons = document.querySelectorAll('.lang');
   const storageKey = 'ejpartners-language';
+  const slideshow = document.querySelector('[data-slideshow]');
+  let updateSlideshowLanguage = () => {};
+
+  if (slideshow) {
+    const slides = Array.from(slideshow.querySelectorAll('.hero-slide'));
+    const dots = Array.from(slideshow.querySelectorAll('[data-slide-to]'));
+    const previousButton = slideshow.querySelector('[data-slide-prev]');
+    const nextButton = slideshow.querySelector('[data-slide-next]');
+    const toggleButton = slideshow.querySelector('[data-slide-toggle]');
+    const status = slideshow.querySelector('[data-slide-status]');
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const interval = Number(slideshow.dataset.interval) || 6800;
+    let activeIndex = Math.max(0, slides.findIndex((slide) => slide.classList.contains('is-active')));
+    let isPlaying = !reducedMotion.matches;
+    let isHovered = false;
+    let hasFocus = false;
+    let isVisible = true;
+    let timer;
+    let animationTimer;
+    let transitionId = 0;
+    let touchStartX = null;
+
+    function updateSlideLabels(language) {
+      const isEnglish = language === 'en';
+      const labels = isEnglish
+        ? { previous: 'Previous photo', next: 'Next photo', pause: 'Pause slideshow', play: 'Play slideshow', choose: 'Choose a photo', region: 'Photos of African teams at work' }
+        : { previous: 'Photo précédente', next: 'Photo suivante', pause: 'Mettre le diaporama en pause', play: 'Lire le diaporama', choose: 'Choisir une photo', region: 'Photographies d’équipes africaines en situation professionnelle' };
+
+      slideshow.setAttribute('aria-label', labels.region);
+      if (previousButton) previousButton.setAttribute('aria-label', labels.previous);
+      if (nextButton) nextButton.setAttribute('aria-label', labels.next);
+      const dotGroup = slideshow.querySelector('.slide-dots');
+      if (dotGroup) dotGroup.setAttribute('aria-label', labels.choose);
+      dots.forEach((dot, index) => {
+        dot.setAttribute('aria-label', isEnglish
+          ? `Show photo ${index + 1} of ${slides.length}`
+          : `Afficher la photo ${index + 1} sur ${slides.length}`);
+      });
+      if (toggleButton) {
+        toggleButton.setAttribute('aria-label', isPlaying ? labels.pause : labels.play);
+        toggleButton.setAttribute('aria-pressed', String(isPlaying));
+        toggleButton.textContent = isPlaying ? 'Ⅱ' : '▶';
+      }
+      slides.forEach((slide) => {
+        const image = slide.querySelector('img');
+        if (image) image.alt = image.getAttribute(isEnglish ? 'data-alt-en' : 'data-alt-fr') || image.alt;
+      });
+    }
+
+    updateSlideshowLanguage = updateSlideLabels;
+
+    function scheduleAutoplay() {
+      window.clearTimeout(timer);
+      if (!isPlaying || isHovered || hasFocus || !isVisible || document.hidden) return;
+      timer = window.setTimeout(() => setSlide(activeIndex + 1), interval);
+    }
+
+    function setSlide(index, announce = false) {
+      const nextIndex = (index + slides.length) % slides.length;
+      const previousIndex = activeIndex;
+      const hasChanged = nextIndex !== previousIndex;
+      window.clearTimeout(animationTimer);
+      transitionId += 1;
+      const currentTransition = transitionId;
+      slides.forEach((slide) => {
+        slide.classList.remove('is-leaving-left', 'is-leaving-right', 'is-entering-left', 'is-entering-right');
+      });
+
+      if (hasChanged && !reducedMotion.matches) {
+        const movingForward = (nextIndex - previousIndex + slides.length) % slides.length === 1;
+        const leavingClass = movingForward ? 'is-leaving-left' : 'is-leaving-right';
+        const enteringClass = movingForward ? 'is-entering-right' : 'is-entering-left';
+        const currentSlide = slides[previousIndex];
+        const nextSlide = slides[nextIndex];
+
+        currentSlide.classList.add(leavingClass);
+        nextSlide.classList.add(enteringClass);
+        void nextSlide.offsetWidth;
+        nextSlide.classList.add('is-active');
+
+        const finishTransition = () => {
+          if (currentTransition !== transitionId) return;
+          slides.forEach((slide) => {
+            slide.classList.remove('is-leaving-left', 'is-leaving-right', 'is-entering-left', 'is-entering-right');
+          });
+          window.clearTimeout(animationTimer);
+        };
+        nextSlide.addEventListener('animationend', finishTransition, { once: true });
+        animationTimer = window.setTimeout(finishTransition, 1200);
+      }
+
+      activeIndex = nextIndex;
+      slides.forEach((slide, slideIndex) => {
+        const isActive = slideIndex === activeIndex;
+        slide.classList.toggle('is-active', isActive);
+        slide.setAttribute('aria-hidden', String(!isActive));
+        slide.inert = !isActive;
+      });
+      dots.forEach((dot, dotIndex) => {
+        const isActive = dotIndex === activeIndex;
+        dot.classList.toggle('is-active', isActive);
+        if (isActive) dot.setAttribute('aria-current', 'true');
+        else dot.removeAttribute('aria-current');
+      });
+      if (announce && status) {
+        const language = document.documentElement.lang === 'en' ? 'en' : 'fr';
+        const caption = slides[activeIndex].querySelector('figcaption')?.textContent.trim() || '';
+        status.textContent = language === 'en'
+          ? `Photo ${activeIndex + 1} of ${slides.length}. ${caption}`
+          : `Photo ${activeIndex + 1} sur ${slides.length}. ${caption}`;
+      }
+      scheduleAutoplay();
+    }
+
+    slides.forEach((slide) => {
+      const image = slide.querySelector('img');
+      if (image) image.loading = 'eager';
+    });
+    dots.forEach((dot, index) => dot.addEventListener('click', () => setSlide(index, true)));
+    if (previousButton) previousButton.addEventListener('click', () => setSlide(activeIndex - 1, true));
+    if (nextButton) nextButton.addEventListener('click', () => setSlide(activeIndex + 1, true));
+    if (toggleButton) toggleButton.addEventListener('click', () => {
+      isPlaying = !isPlaying;
+      updateSlideLabels(document.documentElement.lang);
+      scheduleAutoplay();
+    });
+
+    slideshow.addEventListener('mouseenter', () => {
+      isHovered = true;
+      scheduleAutoplay();
+    });
+    slideshow.addEventListener('mouseleave', () => {
+      isHovered = false;
+      scheduleAutoplay();
+    });
+    slideshow.addEventListener('focusin', () => {
+      hasFocus = true;
+      scheduleAutoplay();
+    });
+    slideshow.addEventListener('focusout', (event) => {
+      if (!slideshow.contains(event.relatedTarget)) {
+        hasFocus = false;
+        scheduleAutoplay();
+      }
+    });
+    slideshow.addEventListener('pointerdown', (event) => {
+      if (event.pointerType === 'touch' && !event.target.closest('button')) touchStartX = event.clientX;
+    });
+    slideshow.addEventListener('pointerup', (event) => {
+      if (touchStartX === null) return;
+      const distance = event.clientX - touchStartX;
+      touchStartX = null;
+      if (Math.abs(distance) > 45) setSlide(activeIndex + (distance < 0 ? 1 : -1), true);
+    });
+    slideshow.addEventListener('pointercancel', () => { touchStartX = null; });
+    document.addEventListener('visibilitychange', scheduleAutoplay);
+
+    if ('IntersectionObserver' in window) {
+      const slideshowObserver = new IntersectionObserver(([entry]) => {
+        isVisible = entry.isIntersecting;
+        scheduleAutoplay();
+      }, { threshold: 0.05 });
+      slideshowObserver.observe(slideshow);
+    }
+
+    updateSlideLabels(document.documentElement.lang);
+    setSlide(activeIndex);
+  }
+
   const revealSelector = [
     '.hero-content > *',
     '.page-hero .wrap > *',
@@ -228,6 +397,7 @@
       const translation = element.getAttribute(`data-${nextLanguage}`);
       if (translation !== null) element.innerHTML = translation;
     });
+    updateSlideshowLanguage(nextLanguage);
 
     const menuLabels = {
       'index.html': ['Accueil', 'Home'],
